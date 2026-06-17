@@ -1,0 +1,20 @@
+{
+  "dataset_cam0_ts0_ns": 7465093169994,
+  "camera_exposure_ts0_ns": 7465093169994,
+  "display_time_ts0_ns": 7465115407826,
+  "camera_to_dataset_offset_ns": 0,
+  "display_to_camera_offset_ns": 0,
+  "display_to_dataset_offset_ns": 0,
+  "residual_ns": {
+    "max_ns": 33333332,
+    "p99_ns": 0,
+    "median_ns": 0,
+    "count_over_1ms": 3,
+    "total": 10459
+  },
+  "init_poses_dropped": 1,
+  "method_t": "first-row anchor: cam0[0] - camera.exposure[0] (t==0 detected)",
+  "warnings": [
+    "Post-validation: aligned tracking.timestamp[0]=7465126453394 != aligned camera.exposure[0]=7465093169994 "
+  ]
+}

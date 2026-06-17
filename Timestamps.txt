@@ -1,0 +1,55 @@
+Timestamps:
+1. camera.csv:
+exposure: the camera frame timestamp = exposure middle, the SLAM timestamp -> join key with tracking.csv frame timestamp
+usb_transfer_done: when the frame finished arriving over USB (host clock); for euroc replay set when the frame is loaded
+sent_to_basalt: host time right before we push the image into basalt (tracker_push_img_sample in t_tracker_slam.cpp)
+flushed: host time when basalts pose for this frame comes back out in flush_poses
+cam_index: which camera gave the timestamp
+source_sequence: equal to frame number as each frame has 2 rows because of the 2 cameras
+
+2. display.csv:
+display_time: the predicted_display time = when_ns, when we predict the photons get displayed -> join key with pose request (locate_views)
+wait_frame: host time when xrWaitFrame was serviced (pacer predict_frame in multi_compositor)
+begin_frame: host time of xrBeginFrame
+locate_views: host time when the app calls xrLocateViews and asks for the pose
+predict_filter: host time after predict + filter computed the pose
+present: host time of xrEndFrame / layer commit, when the frame is handed to the compositor
+frame_id: compositor frame counter -> join key for wait_frame/begin_frame/present
+(rows are keyed two ways: wait_frame/begin_frame/present by frame_id, locate_views/predict_filter by display_time;
+wait_frame carries both so it bridges the two, and the row is written out on present)
+
+3. tracking_timing.csv:
+cam_index: whcich camera gave the timestamp
+source_sequence: equal to frame number as each frame has to 2 rows because of the 2 cameras
+frame_timestamp: exposure middle = (frame_start - frame_end)/2 -> can be used as a join key
+host_transfer_complete: when the frame packet arrives via USB, measured with the host clock
+(host_driver_pushed: before we send it to wmr_source (host clock)
+host_source_received: when we receive the frame in receive_cam
+host_source_pushed: before we send it to t_tracker_slam.cpp
+host_slam_received: in t_tracker_slam.cpp)
+host_slam_pushed_to_vit: just before we send it to basalt
+
+4. compositor_timing.csv:
+frame_id: counter
+when_predict: timestamp when the pacer predicts this frame
+wake_up_target: timestamp by when the compositor should wake up but its only a pacer calculation/prediction no measurement
+when_woke: when the pacer marks the actual wake up time
+when_began: when the pacer marks the beginning of when the compositor starts rendering
+when_submit_begin: marked point before the GPU renders the frame
+when_submit_end: is when we are back from putting the frame into the GPU queue
+gpu_start: when the GPU started rendering the frame from the Vulkan extension
+gpu_end: when the GPU ended rendering the frame from the Vulkan extension
+when_gpu_infoed: when the compositor got alerted about the GPU timestamps
+desired_present: the time that the pacer wants to present, its calculated
+predicted_display: this is when we predict when the photons get displayed headset. This gets sent to the app -> join key with pose_request.when_ns
+last_vblank_before_emit: last vblank timestamp
+present_to_display_offset_estimate: constant=4ms -> its our guess how long present to photons take
+
+5. pose_request_timing.csv:
+when_ns: the predicted_display time for which the pose was requested -> join key with compositor_timing.predicted_display
+slam_rel_ts: SLAM pose timestamp that flush poses put into latest -> join key with tracking_timing.frame_timestamp
+host_request_ns: time when we enter t_slam_get_tracked_pose
+host_flush_done_ns: time after which we cleaned basalts queue
+host_predict_done_ns: timestamp after predict + filter pose
+
+

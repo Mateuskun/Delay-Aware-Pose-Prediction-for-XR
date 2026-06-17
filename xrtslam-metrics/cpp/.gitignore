@@ -1,0 +1,8 @@
+# Linux module
+*.so
+# Stub files
+*.pyi
+# Windows module
+*.pyd
+*.dll
+build

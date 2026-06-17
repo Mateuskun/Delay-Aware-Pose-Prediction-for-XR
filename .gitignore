@@ -1,0 +1,41 @@
+# Datasets (not source)
+/MOO01_hand_puncher_1/
+/MOO01_hand_puncher_1.zip
+
+# Build outputs
+monado/build/
+
+# Python / native artifacts
+__pycache__/
+*.pyc
+*.so
+
+# Tooling / editor / local
+.serena/
+.vscode/
+.claude/
+
+# Logs
+*.log
+
+# Deliberately excluded from this repo
+xrtslam-metrics/pacer.py
+xrtslam-metrics/test/test_golden_pacer.py
+
+# Unwanted root files (not part of this repo)
+/CLAUDE.md
+/THESIS_CONTEXT.md
+/why.txt
+/Pipeline.drawio
+/Pipeline_Pacer.drawio
+/monado-timingcolscsvfix.patch
+/path2.png
+/rect34.png
+
+# Unwanted timing artifacts (only the explicit CSVs + aligned/ are committed)
+/timing/*.png
+/timing/plots/
+/timing/compositor_timing.csv
+/timing/pose_request_timing.csv
+/timing/tracking_timing.csv
+/timing/pacer.csv

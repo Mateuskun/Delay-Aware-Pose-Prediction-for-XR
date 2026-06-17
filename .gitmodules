@@ -1,0 +1,6 @@
+[submodule "basalt"]
+	path = basalt
+	url = https://gitlab.freedesktop.org/mateosss/basalt.git
+[submodule "StereoKit"]
+	path = StereoKit
+	url = https://github.com/StereoKit/StereoKit

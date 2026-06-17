@@ -1,0 +1,8 @@
+.vscode
+__pycache__
+evaluation
+.mypy_cache
+test/data
+.venv
+euroc/MOO11*
+euroc/bags

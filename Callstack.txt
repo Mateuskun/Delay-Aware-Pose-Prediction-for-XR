@@ -1,0 +1,42 @@
+Callstack Block 1:
+1. WMR Headset transfers data by USB to the user/host (wmr_camera.c::wmr_camera_open opens the USB/libusb endpoint) -> wmr_camera_start starts the libusb transfer -> img_xfer_cb is then called by libusb (1. timestamp: host_transfer_complete_ns)
+-> 2. in this function the frame_timestamp (or also called exposure midpoint) is estimated/calculated (2. timestamp: frame_timestamp) -> at the end the driver pushes the frames (3. timestamp: host_driver_pushed_ns) -> wmr_source::receive_cam is called using the sink/function call 
+-> 3. in wmr_source.c (is the frame_server between the driver and the SLAM tracker) receive_cam gets called (4. timestamp: host_source_received_ns)
+-> 4. still in receive_cam we push the frames (5. timestamp: host_source_pushed_ns) -> and we call t_tracker_slam.cpp via the sink/function call again
+-> 5. in t_tracker_slam.cpp::receive_cam(id) we get the frames or rather the function calls the function receive_frame (6. timestamp: host_slam_received_ns)
+-> 6. in receive_frame the vit/basalt is called via t.vit.tracker_push_img_sample(t.tracker, &sample) (7. timestamp: host_slam_pushed_vit_ns) -> from here on out we are in basalt
+
+Callstack Block 2:
+- 1. OpenXR App calls the Monados OpenXR loader functions every frame. (oxr_api_session.c/oxr_session.c)
+-> 2. in oxr_api_session one of the following is called: oxr_xrBeginFrame / oxr_xrLocateViews / oxr_xrWaitFrame => Or rather for a frame the order of the OpenXR calls are xrWaitFrame -> xrBegin... -> xrLocateViews (-> xrEndFrame) but for us only the first 3 matter
+-> 3a. xrWaitFrame: the api gets called by the openxr app
+-> 3b. oxr_session::oxr_session_frame_wait gets called
+-> 3c. if the previous frame is still on xrWaitFrame it blocks until xrBeginFrame is called on the previous frame as only 2 frames can be in flight at the same time
+-> 3d. oxr_session::do_wait_frame_and_checks gets called -> calls xrt_comp_wait_frame which ends up in comp_multi_compositor::multi_compositor_wait_frame
+-> 3e. over xrt_comp_predict_frame -> multi_compositor.c::multi_compositor_predict_frame -> u_pa_predict 
+-> 3f. pa_predict calls predict_display_time which predicts the display_time which is then used to calculate the wake_up_time
+
+(comp_multi_system.c::multi_main_loop -> xrt_comp_predict_frame -> comp_compositor.c::compositor_predict_frame -> comp_target_calc_frame_pacing -> comp_target_swapchain_calc_frame_pacing -> u_pc_predict)
+
+-> 3g. xrWaitFrame/oxr_session_frame_wait returns predictedDisplayTime/DisplayPeriod
+-> 4a. xrBeginFrame:
+-> 4b. oxr_xrBeginFrame starts or rather the oxr_session_frame_begin function starts
+-> 4c. we check if already a xrWaitFrame is in flight or else we block
+-> 4d. xrt_comp_begin_frame calls multi_compositor_begin_frame
+-> 4e. here u_pa_mark_point(POINT_BEGIN) is called -> marks the beginning for the App Pacer; the system compositor is already running in comp_multi_system.c::multi_main_loop 
+-> 5a. xrLocateViews: 
+-> 5b. oxr_session_locate_views calls xrt_device_get_view_poses
+-> 5c. we land in wmr_hmd_get_tracked_pose which calls xrt_tracked_slam_get_tracked_pose -> t_slam_get_tracked_pose (timestamp: host_request_ns)
+-> 5d. we flush the poses to get all of the basalt poses (timestamp: host_flush_done_ns)
+-> 5e. t.slam_rels.get_latest(&slam_rel_ts, &latest_rel) so we get the latest basalt pose (timestamp: slam_rel_ts)
+-> 5f. predict_pose -> filter_pose -> timestamp: host_predict_done_ns -> return to OpenXR App
+-> 6a. xrEndFrame:
+-> 6b. oxr_xrEndFrame -> oxr_session_frame_end: We exit the function early and discard the frame if there are no layers left
+-> 6c. then every layer gets verified -> and we pass the layer onto the compositor to mark the beginning point (xrt_comp_layer_begin) 
+-> 6d. we submit the layers
+-> 6e. and then we finally commit them
+
+Difference between App and System Pacer:
+System Pacer is the actual pacer that we are interested in -> he writes in our timing pipeline
+The app pacer belongs to one openxr session -> he decideds when the xrWaitFrame returns to the App
+How do they work together: the system pacer knows the actual display timing so he broadcasts it to all of the app pacers. 
