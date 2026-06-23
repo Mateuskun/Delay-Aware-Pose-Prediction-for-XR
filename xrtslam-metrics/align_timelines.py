@@ -71,41 +71,9 @@ def consistency_check(
     return warnings
 
 
-def find_t(camera_data: np.ndarray, camera_cols: List[str], cam0_first_ts: int) -> Tuple[int, str]:
-    exposure_idx = camera_cols.index("exposure")
-    cam_first = int(camera_data[0, exposure_idx])
-    t = cam0_first_ts - cam_first
-    method = "first-row anchor: cam0[0] - camera.exposure[0]"
-    if t == 0:
-        info("Camera timeline already in dataset clock (EUROC_USE_SOURCE_TS likely active)")
-        method += " (t==0 detected)"
-    return t, method
-
-
-def find_s(
-    display_data: np.ndarray,
-    display_cols: List[str],
-    filtering: Trajectory,
-) -> Tuple[int, str, dict]:
-    s = 0
-    display_time_idx = display_cols.index("display_time")
-    display_ts = np.sort(display_data[:, display_time_idx])
-    filt_ts = filtering.ts.flatten()
-
-    idx = np.searchsorted(display_ts, filt_ts)
-    idx = np.clip(idx, 1, len(display_ts) - 1)
-    left = display_ts[idx - 1]
-    right = display_ts[idx]
-    residuals = np.minimum(np.abs(filt_ts - left), np.abs(filt_ts - right))
-    stats = {
-        "max_ns": int(residuals.max()),
-        "p99_ns": int(np.percentile(residuals, 99)),
-        "median_ns": int(np.median(residuals)),
-        "count_over_1ms": int((residuals > 1_000_000).sum()),
-        "total": int(len(residuals)),
-    }
-
-    return s, stats
+def find_t(camera_data: np.ndarray, camera_cols: List[str], cam0_first_ts: int) -> int:
+    cam_first = int(camera_data[0, camera_cols.index("exposure")])
+    return cam0_first_ts - cam_first
 
 
 def filter_init_poses(traj: Trajectory) -> int:
@@ -265,25 +233,19 @@ def main() -> None:
         camera_data, camera_cols, tracking, display_data, display_cols, filtering
     )
 
-    t, t_method = find_t(camera_data, camera_cols, cam0_first)
-    s, stats = find_s(display_data, display_cols, filtering)
+    # One offset for everything (see find_t): at speed 1 it is 0.
+    t = find_t(camera_data, camera_cols, cam0_first)
     info(f"t (camera→dataset) = {t} ns ({t / 1e6:.3f} ms)")
-    info(
-        f"s (display→camera) = {s} ns ({s / 1e6:.3f} ms), bridge residual "
-        f"median={stats['median_ns']} p99={stats['p99_ns']} "
-        f"max={stats['max_ns']} ns "
-        f"({stats['count_over_1ms']}/{stats['total']} > 1ms)"
-    )
 
     n_init = filter_init_poses(tracking)
     if n_init:
         info(f"Filtered {n_init} init poses from tracking.csv (all-zero xyz)")
 
-    display_aligned = shift_event_csv(display_data, display_cols, DISPLAY_TS_COLS, s + t)
+    display_aligned = shift_event_csv(display_data, display_cols, DISPLAY_TS_COLS, t)
     camera_aligned = shift_event_csv(camera_data, camera_cols, CAMERA_TS_COLS, t)
     tracking = shift_trajectory(tracking, t)
-    filtering = shift_trajectory(filtering, s + t)
-    prediction = shift_trajectory(prediction, s + t)
+    filtering = shift_trajectory(filtering, t)
+    prediction = shift_trajectory(prediction, t)
 
     write_event_csv(out_dir / "display.csv", display_cols, display_aligned)
     write_event_csv(out_dir / "camera.csv", camera_cols, camera_aligned)
@@ -296,24 +258,14 @@ def main() -> None:
     offsets = {
         "dataset_cam0_ts0_ns": cam0_first,
         "camera_exposure_ts0_ns": int(camera_data[0, camera_cols.index("exposure")]),
-        "display_time_ts0_ns": int(display_data[0, display_cols.index("display_time")]),
         "camera_to_dataset_offset_ns": int(t),
-        "display_to_camera_offset_ns": int(s),
-        "display_to_dataset_offset_ns": int(s + t),
-        "residual_ns": stats,
         "init_poses_dropped": int(n_init),
-        "method_t": t_method,
         "warnings": consistency_warnings + post_warnings,
     }
     with open(out_dir / "offsets.json", "w", encoding="utf-8") as f:
         json.dump(offsets, f, indent=2)
 
     info(f"Wrote aligned CSVs + offsets.json to {out_dir}")
-    gt = dataset_dir / "mav0" / "gt" / "data.csv"
-    info("Next steps:")
-    info(f"  python xrtslam-metrics/tracking.py ate {gt} {out_dir}/tracking.csv --plot")
-    info(f"  python xrtslam-metrics/tracking.py ate {gt} {out_dir}/filtering.csv --plot")
-    info(f"  python xrtslam-metrics/tracking.py ate {gt} {out_dir}/prediction.csv --plot")
 
 
 if __name__ == "__main__":
