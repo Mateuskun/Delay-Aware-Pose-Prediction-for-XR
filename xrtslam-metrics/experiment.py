@@ -53,7 +53,11 @@ def run_experiment(
     out_dir,
     predictions: list[tuple[str, PredictionType]] | None = None,
     filter_config: FilterConfig | None = None,
+    slam_dir=None,
 ) -> dict:
+    # slam_dir is None for a full replay (flavor A: SLAM/IMU live in timing_dir);
+    # for WMR timing injection (flavor B) it points at the dataset replay that
+    # carries the SLAM trajectory + IMU, while timing_dir carries the WMR timing.
     timing_dir = Path(timing_dir)
     dataset_dir = Path(dataset_dir)
     out_dir = Path(out_dir)
@@ -67,6 +71,7 @@ def run_experiment(
         res = replay_run(
             timing_dir, out_dir / name,
             pred_type=pred_type, filter_config=fc, dataset_dir=dataset_dir,
+            slam_dir=slam_dir,
         )
         results[name] = {
             "prediction": score(res.prediction_path, gt),

@@ -74,6 +74,9 @@ def parse_args():
     sp.add_argument("--out", type=Path, required=True, help="output dir for tracking/prediction/filtering.csv")
     sp.add_argument("--method", choices=_METHODS, default="dead_reckoning",
                     help="prediction method to use (predict to the recorded when_ns)")
+    sp.add_argument("--slam-dir", type=Path, default=None,
+                    help="flavor B: dir with the SLAM trajectory + IMU (the dataset replay); "
+                         "--timing-dir then supplies only the WMR display/camera timing")
 
     # experiment
     sp = subparsers.add_parser(cmd_experiment.name, help=cmd_experiment.desc)
@@ -81,6 +84,9 @@ def parse_args():
     sp.add_argument("--timing-dir", type=Path, required=True, help="dir with the recorded CSVs")
     sp.add_argument("--dataset", type=Path, required=True, help="EuRoC dataset dir (clock anchor + GT)")
     sp.add_argument("--out", type=Path, required=True, help="output dir for the per-method replay CSVs")
+    sp.add_argument("--slam-dir", type=Path, default=None,
+                    help="flavor B: dir with the SLAM trajectory + IMU (the dataset replay); "
+                         "--timing-dir then supplies only the WMR display/camera timing")
 
     return parser.parse_args()
 
@@ -104,7 +110,8 @@ def move_timeline(args: Namespace):
 def replay(args: Namespace):
     """Regenerate tracking/prediction/filtering.csv, one pose per when_ns."""
     pred_type = PredictionType[args.method.upper()]
-    res = replay_run(args.timing_dir, args.out, pred_type=pred_type, dataset_dir=args.dataset)
+    res = replay_run(args.timing_dir, args.out, pred_type=pred_type,
+                     dataset_dir=args.dataset, slam_dir=args.slam_dir)
     print(f"[{args.method}] wrote {res.n_predicted} poses ({res.n_skipped} skipped) to {args.out}")
     print(f"  {res.tracking_path}")
     print(f"  {res.prediction_path}")
@@ -113,7 +120,7 @@ def replay(args: Namespace):
 
 def experiment(args: Namespace):
     """Sweep the prediction methods and print ATE/RTE against the dataset GT."""
-    res = run_experiment(args.timing_dir, args.dataset, args.out)
+    res = run_experiment(args.timing_dir, args.dataset, args.out, slam_dir=args.slam_dir)
     print(f"{'method':>16} {'pred ATE':>10} {'pred RTE':>10} {'filt ATE':>10} {'filt RTE':>10}")
     print("-" * 62)
     for name in res:

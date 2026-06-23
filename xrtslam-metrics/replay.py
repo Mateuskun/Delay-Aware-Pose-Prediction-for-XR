@@ -46,15 +46,27 @@ def replay_run(
     pred_type: PredictionType = PredictionType.DEAD_RECKONING,
     filter_config: FilterConfig | None = None,
     dataset_dir: Path | None = None,
+    slam_dir: Path | None = None,
 ) -> ReplayResult:
+    # timing_dir provides the display-path timing (display.csv + camera.csv anchor).
+    # slam_dir provides the SLAM trajectory + IMU (slam_relations.csv + imu.csv).
+    # They are the same dir for a full replay (flavor A); for WMR timing injection
+    # (flavor B) timing_dir is the WMR run and slam_dir is the dataset replay. Each
+    # source is rebased onto the dataset cam0 clock via its own camera.csv anchor,
+    # so the two timelines join consistently after the offset.
     timing_dir = Path(timing_dir)
+    slam_dir = Path(slam_dir) if slam_dir is not None else timing_dir
     out_dir = Path(out_dir)
 
-    offset = dataset_clock_offset(timing_dir, dataset_dir) if dataset_dir is not None else 0
+    if dataset_dir is not None:
+        display_offset = dataset_clock_offset(timing_dir, dataset_dir)
+        slam_offset = dataset_clock_offset(slam_dir, dataset_dir)
+    else:
+        display_offset = slam_offset = 0
 
-    events = load_display_events(timing_dir / "display.csv", ts_offset=offset)
-    rels = load_slam_relations(timing_dir / "slam_relations.csv", ts_offset=offset)
-    imu = load_imu(timing_dir / "imu.csv", ts_offset=offset)
+    events = load_display_events(timing_dir / "display.csv", ts_offset=display_offset)
+    rels = load_slam_relations(slam_dir / "slam_relations.csv", ts_offset=slam_offset)
+    imu = load_imu(slam_dir / "imu.csv", ts_offset=slam_offset)
 
     history = RelationHistory()
     posefilter = PoseFilter(filter_config or FilterConfig(use_one_euro_filter=True))
