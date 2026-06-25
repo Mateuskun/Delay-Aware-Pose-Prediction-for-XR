@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from csvio import dataset_clock_offset, load_display_events, load_imu, load_slam_relations
+from csvio import SlamSource, dataset_clock_offset, load_display_events
 from filter import FilterConfig, PoseFilter
 from math3d import SpaceRelation
 from predict import PredictionType, RelationHistory, predict_pose
@@ -47,26 +47,40 @@ def replay_run(
     filter_config: FilterConfig | None = None,
     dataset_dir: Path | None = None,
     slam_dir: Path | None = None,
+    slam_source: SlamSource | None = None,
 ) -> ReplayResult:
     # timing_dir provides the display-path timing (display.csv + camera.csv anchor).
-    # slam_dir provides the SLAM trajectory + IMU (slam_relations.csv + imu.csv).
-    # They are the same dir for a full replay (flavor A); for WMR timing injection
-    # (flavor B) timing_dir is the WMR run and slam_dir is the dataset replay. Each
-    # source is rebased onto the dataset cam0 clock via its own camera.csv anchor,
-    # so the two timelines join consistently after the offset.
+    # The SLAM trajectory + IMU come from either slam_dir (a Monado run:
+    # slam_relations.csv + accel-first imu.csv, host clock → dataset_clock_offset)
+    # or an explicit slam_source (e.g. a patched basalt_vio run, already in the
+    # dataset clock; see csvio.basalt_slam_source). For a full Monado replay
+    # (flavor A) slam_dir == timing_dir; for timing injection (flavor B) timing_dir
+    # is the WMR/StereoKit run and the SLAM comes from the dataset run / Basalt.
+    # Each source is rebased onto the dataset cam0 clock by its own offset, so the
+    # two timelines join consistently.
     timing_dir = Path(timing_dir)
-    slam_dir = Path(slam_dir) if slam_dir is not None else timing_dir
     out_dir = Path(out_dir)
 
     if dataset_dir is not None:
         display_offset = dataset_clock_offset(timing_dir, dataset_dir)
-        slam_offset = dataset_clock_offset(slam_dir, dataset_dir)
     else:
-        display_offset = slam_offset = 0
+        display_offset = 0
+
+    if slam_source is None:
+        slam_dir = Path(slam_dir) if slam_dir is not None else timing_dir
+        slam_offset = (
+            dataset_clock_offset(slam_dir, dataset_dir) if dataset_dir is not None else 0
+        )
+        slam_source = SlamSource(
+            relations_path=slam_dir / "slam_relations.csv",
+            imu_path=slam_dir / "imu.csv",
+            imu_euroc=False,
+            clock_offset=slam_offset,
+        )
 
     events = load_display_events(timing_dir / "display.csv", ts_offset=display_offset)
-    rels = load_slam_relations(slam_dir / "slam_relations.csv", ts_offset=slam_offset)
-    imu = load_imu(slam_dir / "imu.csv", ts_offset=slam_offset)
+    rels = slam_source.load_relations()
+    imu = slam_source.load_imu()
 
     history = RelationHistory()
     posefilter = PoseFilter(filter_config or FilterConfig(use_one_euro_filter=True))

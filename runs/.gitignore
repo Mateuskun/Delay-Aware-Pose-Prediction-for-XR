@@ -1,0 +1,29 @@
+# What goes to GitHub: the reproducible skeleton — build_baseline.py, the README,
+# per-run meta.yaml, the final ATE/RTE table, and the two recorded WMR timing
+# inputs (display.csv + camera.csv). Everything else is large and regenerable by
+# `python3 runs/build_baseline.py`: the basalt intermediates (slam/), the GT
+# copies (baseline_targets/), the estimate trajectories (baseline_eval/), and
+# each WMR run's own discarded SLAM outputs (filtering/prediction/imu/...).
+
+# heavy / regenerable by default
+*.csv
+*.png
+out/
+plots/
+
+# regenerable working trees — never push
+baseline_eval/
+baseline_targets/
+slam/
+
+# keep docs + per-run metadata + template + the final table
+!README.md
+!_template/
+!**/meta.yaml
+!baseline_table.txt
+!baseline_table.json
+
+# keep ONLY the recorded WMR timing inputs (the actual recorded "datasets").
+# Force-add a run's other CSVs with `git add -f runs/NN_label/<file>` if needed.
+!**/display.csv
+!**/camera.csv

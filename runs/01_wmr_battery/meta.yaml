@@ -1,0 +1,13 @@
+# One recorded timing run. Copy this file into each runs/NN_<label>/ folder and
+# fill it in. Free-form; it documents the condition the CSVs were recorded under.
+
+label: "wmr_battery"            # short human label, e.g. "desktop_idle_90hz"
+date: "2026-06-25"             # YYYY-MM-DD
+
+machine: "mateus-fedora / AMD Ryzen 7 5800HS / Radeon Vega (Cezanne) / kernel 7.0.12-101.fc43"
+app: "StereoKitCTest"          # the OpenXR app driving the runtime (or game name)
+dataset: "baseline matrix (MOO02/MGO02/MIO02/MOO13/TR2) — timing injected onto each; not scored on its own"
+
+display_hz: "90"               # measured ~90.0 Hz over the run
+power_profile: "powersave"     # tuned-adm active = powersave (battery condition)
+stress: false                  # was a CPU/GPU stress program running in the background?

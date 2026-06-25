@@ -1,0 +1,13 @@
+# One recorded timing run. Copy this file into each runs/NN_<label>/ folder and
+# fill it in. Free-form; it documents the condition the CSVs were recorded under.
+
+label: ""                       # short human label, e.g. "desktop_idle_90hz"
+date: ""                        # YYYY-MM-DD
+
+machine: ""                     # hostname / CPU / GPU
+app: "StereoKitCTest"           # the OpenXR app driving the runtime (or game name)
+dataset: "MOO01_hand_puncher_1" # GT-bearing dataset this run replays / is scored against
+
+display_hz: ""                  # XRT_COMPOSITOR_DEFAULT_FRAMERATE used: 60 / 90 / 120
+power_profile: ""               # performance / balanced / powersave
+stress: false                   # was a CPU/GPU stress program running in the background?

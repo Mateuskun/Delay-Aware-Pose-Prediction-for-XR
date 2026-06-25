@@ -95,11 +95,23 @@ def load_slam_relations(path: Path, ts_offset: int = 0) -> list[tuple[int, Space
 
 
 def load_imu(path: Path, ts_offset: int = 0) -> ImuHistory:
+    # Monado imu.csv column order: ts, ax, ay, az, wx, wy, wz (accel-first).
     imu = ImuHistory()
     for row in _iter_rows(path):
         ts = int(float(row[0])) + ts_offset
         accel = vec3(float(row[1]), float(row[2]), float(row[3]))
         gyro = vec3(float(row[4]), float(row[5]), float(row[6]))
+        imu.push(ts, gyro, accel)
+    return imu
+
+
+def load_imu_euroc(path: Path, ts_offset: int = 0) -> ImuHistory:
+    # EuRoC mav0/imu0/data.csv column order: ts, wx, wy, wz, ax, ay, az (gyro-first).
+    imu = ImuHistory()
+    for row in _iter_rows(path):
+        ts = int(float(row[0])) + ts_offset
+        gyro = vec3(float(row[1]), float(row[2]), float(row[3]))
+        accel = vec3(float(row[4]), float(row[5]), float(row[6]))
         imu.push(ts, gyro, accel)
     return imu
 
@@ -121,3 +133,42 @@ def dataset_clock_offset(timing_dir: Path, dataset_dir: Path) -> int:
     """ We use this to calculate t"""
     timing_dir = Path(timing_dir)
     return dataset_cam0_first_ns(dataset_dir) - first_camera_exposure_ns(timing_dir / "camera.csv")
+
+
+@dataclass
+class SlamSource:
+    """Where the SLAM trajectory + IMU come from for a replay.
+
+    Abstracts the difference between a Monado run dir (slam_relations.csv +
+    accel-first imu.csv, host clock → needs a dataset_clock_offset) and a
+    standalone Basalt run (slam_relations.csv produced by the patched
+    basalt_vio + gyro-first EuRoC imu0, already in the dataset clock → offset 0).
+    """
+
+    relations_path: Path
+    imu_path: Path
+    imu_euroc: bool = False  # gyro-first EuRoC imu0 order vs accel-first Monado imu.csv
+    clock_offset: int = 0  # ns added to every SLAM/IMU timestamp (0 if already dataset-clock)
+
+    def load_relations(self) -> list[tuple[int, SpaceRelation]]:
+        return load_slam_relations(self.relations_path, ts_offset=self.clock_offset)
+
+    def load_imu(self) -> ImuHistory:
+        loader = load_imu_euroc if self.imu_euroc else load_imu
+        return loader(self.imu_path, ts_offset=self.clock_offset)
+
+
+def basalt_slam_source(basalt_dir: Path, dataset_dir: Path) -> SlamSource:
+    """SLAM source for a standalone (patched) basalt_vio run on an EuRoC dataset.
+
+    slam_relations.csv comes from basalt_vio --save-relations-fn; IMU comes from
+    the dataset's mav0/imu0/data.csv. Both are already in the dataset clock.
+    """
+    basalt_dir = Path(basalt_dir)
+    dataset_dir = Path(dataset_dir)
+    return SlamSource(
+        relations_path=basalt_dir / "slam_relations.csv",
+        imu_path=dataset_dir / "mav0" / "imu0" / "data.csv",
+        imu_euroc=True,
+        clock_offset=0,
+    )

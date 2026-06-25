@@ -89,14 +89,14 @@ class PoseCurvesPlot(TrackingPlot):
     def plot_estimate_trajectory(
         self,
         traj_est: PoseTrajectory3D,
-        traj_ref_synced: PoseTrajectory3D = None,
+        traj_ref: PoseTrajectory3D = None,
         est_name: str = "estimate",
     ):
         if not self.show_plot:
             return
         traj_aligned = deepcopy(traj_est)
-        if traj_ref_synced is not None:
-            traj_aligned.align(traj_ref_synced, correct_scale=False)
+        if traj_ref is not None:
+            traj_aligned.align(traj_ref, correct_scale=False)
         color = next(self.colors)
         plot.traj_xyz(self.xyz_axes, traj_aligned, color=color, label=est_name, alpha=0.85,
                       start_timestamp=self.start_timestamp)
@@ -591,7 +591,7 @@ def compute_tracking_stats(
     ref_name = "groundtruth"
 
     if pose_curves_plot is not None:
-        pose_curves_plot.plot_estimate_trajectory(traj_est, traj_ref_synced=traj_ref, est_name=est_name)
+        pose_curves_plot.plot_estimate_trajectory(traj_est, traj_ref=traj_ref, est_name=est_name)
 
     result = Result()
 
